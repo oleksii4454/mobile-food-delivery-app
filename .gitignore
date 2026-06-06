@@ -1,0 +1,78 @@
+# System files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+Log.txt
+*.log
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Backend
+
+# Node.js
+backend/node_modules/
+backend/npm-debug.log*
+backend/yarn-debug.log*
+backend/yarn-error.log*
+
+# .env
+backend/.env.local
+backend/.env.development.local
+backend/.env.test.local
+backend/.env.production.local
+
+# Frontend
+
+# Tooling artifacts
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/.pub-cache/
+frontend/.pub/
+frontend/build/
+
+# Web specific artifacts
+frontend/build/web/
+
+# Android specific artifacts
+frontend/android/app/build.gradle.updated
+frontend/android/.gradle/
+frontend/android/local.properties
+frontend/android/generated_gradle_build_settings.gradle
+frontend/android/app/src/main/java/io/flutter/plugins/
+frontend/android/app/libs/armeabi-v7a/libflutter.so
+frontend/android/app/libs/arm64-v8a/libflutter.so
+frontend/android/app/libs/x86_64/libflutter.so
+frontend/android/app/libs/x86/libflutter.so
+
+# iOS specific artifacts
+frontend/ios/.symlinks/
+frontend/ios/Pods/
+frontend/ios/Flutter/Flutter.framework
+frontend/ios/Flutter/Flutter.podspec
+frontend/ios/Flutter/GeneratedPluginRegistrant.h
+frontend/ios/Flutter/GeneratedPluginRegistrant.m
+frontend/ios/Flutter/app.flx
+frontend/ios/Flutter/app.zip
+frontend/ios/Flutter/flutter_assets/
+frontend/ios/Flutter/flutter_export_environment.sh
+frontend/ios/ServiceDefinitions.json
+frontend/ios/Runner/GeneratedPluginRegistrant.h
+frontend/ios/Runner/GeneratedPluginRegistrant.m
+
+# Derived type definitions
+frontend/**/*.g.dart
+frontend/**/*.freezed.dart
+
+# Docker
+postgres_data/
+.docker/
