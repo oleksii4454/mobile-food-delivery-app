@@ -24,8 +24,7 @@ backend/yarn-debug.log*
 backend/yarn-error.log*
 
 # .env
-backend/.env.local
-backend/.env.development.local
+backend/.env
 backend/.env.test.local
 backend/.env.production.local
 
