@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../home/home_screen.dart';
 import 'register_screen.dart';
+import '../admin/admin_panel_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -32,6 +33,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
     });
 
+    // Викликаємо сервіс логіну
     final result = await _authService.login(email, password);
 
     if (!mounted) return;
@@ -40,20 +42,31 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = false;
     });
 
-    if (result['success']) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => HomeScreen(token: result['token']),
-        ),
-      );
-    } else {
+    if (result['success'] == true) {
+      final String role = (result['role'] ?? 'Клієнт').toString().trim();
+      final String token = result['token'].toString();
+
+      print("Роль, яка прийшла з серверу: '$role'");
+
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['error']),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text("Успішний вхід! Роль: $role"), backgroundColor: Colors.green),
       );
+
+      if (role == 'Адмін') {
+        print("Перенаправлення в адмін-панель");
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const AdminPanelScreen()),
+        );
+      } else {
+        print("Перенаправлення на домашній екран для користувача/кур'єра");
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomeScreen(token: token)), 
+        );
+      }
     }
   }
 
