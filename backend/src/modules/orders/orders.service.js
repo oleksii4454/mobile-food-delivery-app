@@ -1,4 +1,4 @@
-const pool = require('../../config/db');
+const db = require('../../config/db'); 
 
 class OrdersService {
   async createOrder(orderData, user) {
@@ -8,53 +8,54 @@ class OrdersService {
       throw new Error('Кошик порожній');
     }
 
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-
+    
+    
+    return await db.$transaction(async (tx) => {
       let totalPrice = 0;
+      const verifiedItems = [];
+
+      
       for (const orderItem of items) {
-        const itemResult = await client.query('SELECT price FROM items WHERE id = $1', [orderItem.item_id]);
-        
-        if (itemResult.rows.length === 0) {
+        const item = await tx.item.findUnique({
+          where: { id: parseInt(orderItem.item_id, 10) }
+        });
+
+        if (!item) {
           throw new Error(`Товар з ID ${orderItem.item_id} не знайдено в меню`);
         }
+
+        totalPrice += Number(item.price) * orderItem.quantity;
         
-        totalPrice += Number(itemResult.rows[0].price) * orderItem.quantity;
+        
+        verifiedItems.push({
+          item_id: parseInt(orderItem.item_id, 10),
+          quantity: parseInt(orderItem.quantity, 10)
+        });
       }
 
-      const insertOrderQuery = `
-        INSERT INTO orders (user_id, establishment_id, status, total_price, delivery_address) 
-        VALUES ($1, $2, $3, $4, $5) 
-        RETURNING id, status, total_price, delivery_address
-      `;
       
-      const orderResult = await client.query(insertOrderQuery, [
-        user.id,               
-        establishment_id, 
-        'Опрацьовується', 
-        totalPrice, 
-        delivery_address
-      ]);
       
-      const newOrder = orderResult.rows[0];
+      const newOrder = await tx.order.create({
+        data: {
+          user_id: parseInt(user.id, 10),
+          establishment_id: parseInt(establishment_id, 10) || null,
+          status: 'Опрацьовується',
+          total_price: totalPrice,
+          delivery_address: delivery_address || ''
+        }
+      });
 
-      const insertOrderItemQuery = `
-        INSERT INTO order_items (order_id, item_id, quantity) 
-        VALUES ($1, $2, $3)
-      `;
+      
+      
+      await tx.orderItem.createMany({
+        data: verifiedItems.map(item => ({
+          order_id: newOrder.id,
+          item_id: item.item_id,
+          quantity: item.quantity
+        }))
+      });
 
-      for (const orderItem of items) {
-        await client.query(insertOrderItemQuery, [
-          newOrder.id,
-          orderItem.item_id, 
-          orderItem.quantity
-        ]);
-      }
-
-      await client.query('COMMIT');
-
-      console.log(`[PostgreSQL] Повноцінне замовлення #${newOrder.id} успішно збережено в таблиці orders та order_items!`);
+      console.log(`[Prisma] Повноцінне замовлення #${newOrder.id} успішно збережено в таблиці orders та order_items!`);
 
       return {
         id: newOrder.id,
@@ -62,15 +63,26 @@ class OrdersService {
         total_price: newOrder.total_price,
         message: 'Замовлення успішно сформовано та записано в БД!'
       };
-
-    } catch (error) {
-      await client.query('ROLLBACK');
-      console.error('Помилка всередині транзакції замовлення, робимо ROLLBACK:', error.message);
-      throw error;
-    } finally {
-      client.release();
-    }
+    });
   }
+
+  async getOrdersByUserId(userId) {
+  return await db.order.findMany({
+    where: {
+      user_id: parseInt(userId, 10)
+    },
+    include: {
+      order_items: { 
+        include: {
+          item: true
+        }
+      }
+    },
+    orderBy: {
+      id: 'desc'
+    }
+  });
+}
 }
 
 module.exports = new OrdersService();
