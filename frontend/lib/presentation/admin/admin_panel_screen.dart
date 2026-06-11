@@ -25,10 +25,15 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   String? _selectedEstablishmentId;
   bool _isItemLoading = false;
 
+  
+  List<dynamic> _allGlobalOrders = [];
+  bool _isOrdersLoading = false;
+
   @override
   void initState() {
     super.initState();
     _fetchEstablishmentsLookup();
+    _fetchGlobalOrders(); 
   }
 
   @override
@@ -64,6 +69,60 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       setState(() {
         _establishmentsDropdownList = [];
       });
+    }
+  }
+
+  
+  Future<void> _fetchGlobalOrders() async {
+    setState(() { _isOrdersLoading = true; });
+    try {
+      final response = await http.get(
+        Uri.parse('http://localhost:3000/api/orders/admin'),
+        headers: {
+          'Authorization': 'Bearer ${widget.token}',
+        },
+      );
+      if (response.statusCode == 200) {
+        final decodedData = jsonDecode(response.body);
+        setState(() {
+          _allGlobalOrders = decodedData is List ? decodedData : [];
+        });
+      }
+    } catch (e) {
+      debugPrint('Error getting administrative system orders: $e');
+    } finally {
+      setState(() { _isOrdersLoading = false; });
+    }
+  }
+
+  
+  Future<void> _updateOrderStatus(dynamic orderId, String newStatus) async {
+    try {
+      final response = await http.patch(
+        Uri.parse('http://localhost:3000/api/orders/$orderId/status'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.token}',
+        },
+        body: jsonEncode({'status': newStatus}),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Статус замовлення змінено!"), backgroundColor: Colors.green),
+        );
+        _fetchGlobalOrders(); 
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Помилка оновлення статусу"), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Помилка з'єднання з сервером")),
+      );
     }
   }
 
@@ -117,7 +176,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     }
   }
 
-  
   void _createMenuItem() async {
     final name = _itemNameController.text.trim();
     final priceStr = _itemPriceController.text.trim();
@@ -173,7 +231,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3, 
       child: Scaffold(
         appBar: AppBar(
           title: const Text("Панель адміністратора"),
@@ -183,6 +241,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             tabs: [
               Tab(icon: Icon(Icons.storefront, color: Colors.white), child: Text("Заклади", style: TextStyle(color: Colors.white))),
               Tab(icon: Icon(Icons.restaurant_menu, color: Colors.white), child: Text("Страви/Товари", style: TextStyle(color: Colors.white))),
+              Tab(icon: Icon(Icons.assignment_turned_in, color: Colors.white), child: Text("Замовлення", style: TextStyle(color: Colors.white))), 
             ],
           ),
         ),
@@ -217,7 +276,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                           ),
                           const SizedBox(height: 16),
                           DropdownButtonFormField<String>(
-                            value: _selectedEstType,
+                            initialValue: _selectedEstType,
                             decoration: const InputDecoration(
                               labelText: "Тип закладу",
                               border: OutlineInputBorder(),
@@ -277,9 +336,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 24),
-                          
-                          
-                          
                           (_establishmentsDropdownList.isEmpty)
                               ? DropdownButtonFormField<String>(
                                   onChanged: null,
@@ -309,7 +365,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                     });
                                   },
                                 ),
-                          
                           const SizedBox(height: 16),
                           TextField(
                             controller: _itemNameController,
@@ -354,6 +409,98 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                 ),
               ),
             ),
+
+            
+            _isOrdersLoading
+                ? const Center(child: CircularProgressIndicator(color: Colors.redAccent))
+                : RefreshIndicator(
+                    color: Colors.redAccent,
+                    onRefresh: _fetchGlobalOrders,
+                    child: _allGlobalOrders.isEmpty
+                        ? const Center(
+                            child: Text(
+                              "Активних замовлень у системі немає.",
+                              style: TextStyle(fontSize: 16, color: Colors.grey),
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            itemCount: _allGlobalOrders.length,
+                            itemBuilder: (context, index) {
+                              final order = _allGlobalOrders[index];
+                              final orderItemsList = order['order_items'] ?? order['items'] ?? [];
+                              final currentStatus = order['status'] ?? 'Опрацьовується';
+
+                              return Card(
+                                margin: const EdgeInsets.symmetric(vertical: 8),
+                                elevation: 3,
+                                child: ExpansionTile(
+                                  iconColor: Colors.redAccent,
+                                  title: Text(
+                                    "Замовлення #${order['id']} — Користувач ID: ${order['user_id']}",
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                  subtitle: Text("Поточний статус: $currentStatus"),
+                                  children: [
+                                    const Divider(height: 1),
+                                    if (orderItemsList is List)
+                                      ...orderItemsList.map<Widget>((dynamic orderItem) {
+                                        final itemDetails = orderItem['item'] ?? {};
+                                        final price = double.tryParse(itemDetails['price']?.toString() ?? '0') ?? 0;
+                                        final qty = orderItem['quantity'] ?? 0;
+                                        return ListTile(
+                                          title: Text(itemDetails['name'] ?? 'Страва'),
+                                          subtitle: Text("Кількість: x$qty"),
+                                          trailing: Text("${(qty * price).toStringAsFixed(2)} грн"),
+                                        );
+                                      }),
+                                    const Divider(),
+                                    
+                                    
+                                    ListTile(
+                                      title: const Text(
+                                        "Загальна сума:", 
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black)
+                                      ),
+                                      trailing: Text(
+                                        "${order['total_price'] ?? order['total']} грн", 
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black)
+                                      ),
+                                    ),
+                                    
+                                    
+                                    Padding(
+                                      padding: const EdgeInsets.all(16.0),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Text("Змінити стан:", style: TextStyle(fontWeight: FontWeight.w500)),
+                                          DropdownButton<String>(
+                                            value: ['Опрацьовується', 'Готується', 'Доставляється', 'Доставлено'].contains(currentStatus) 
+                                                ? currentStatus 
+                                                : 'Опрацьовується',
+                                            items: const [
+                                              DropdownMenuItem(value: 'Опрацьовується', child: Text('Опрацьовується')),
+                                              DropdownMenuItem(value: 'Готується', child: Text('Готується')),
+                                              DropdownMenuItem(value: 'Доставляється', child: Text('Доставляється')),
+                                              DropdownMenuItem(value: 'Доставлено', child: Text('Доставлено')),
+                                            ],
+                                            onChanged: (newStatus) {
+                                              if (newStatus != null && newStatus != currentStatus) {
+                                                _updateOrderStatus(order['id'], newStatus);
+                                              }
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                  ),
           ],
         ),
       ),
