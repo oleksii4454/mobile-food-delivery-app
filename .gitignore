@@ -75,3 +75,7 @@ frontend/**/*.freezed.dart
 # Docker
 postgres_data/
 .docker/
+
+# Prisma
+backend/node_modules/.prisma/
+backend/src/generated/
