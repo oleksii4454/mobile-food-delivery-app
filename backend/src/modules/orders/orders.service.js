@@ -8,24 +8,20 @@ class OrdersService {
       throw new Error('Кошик порожній');
     }
 
-    
-    
     return await db.$transaction(async (tx) => {
       let totalPrice = 0;
       const verifiedItems = [];
 
-      
       for (const orderItem of items) {
         const item = await tx.item.findUnique({
           where: { id: parseInt(orderItem.item_id, 10) }
         });
 
         if (!item) {
-          throw new Error(`Товар з ID ${orderItem.item_id} не знайдено в меню`);
+          throw new Error(`Товар з ID ${orderItem.item_id} не знадено в меню`);
         }
 
         totalPrice += Number(item.price) * orderItem.quantity;
-        
         
         verifiedItems.push({
           item_id: parseInt(orderItem.item_id, 10),
@@ -33,8 +29,6 @@ class OrdersService {
         });
       }
 
-      
-      
       const newOrder = await tx.order.create({
         data: {
           user_id: parseInt(user.id, 10),
@@ -45,8 +39,6 @@ class OrdersService {
         }
       });
 
-      
-      
       await tx.orderItem.createMany({
         data: verifiedItems.map(item => ({
           order_id: newOrder.id,
@@ -67,22 +59,50 @@ class OrdersService {
   }
 
   async getOrdersByUserId(userId) {
-  return await db.order.findMany({
-    where: {
-      user_id: parseInt(userId, 10)
-    },
-    include: {
-      order_items: { 
-        include: {
-          item: true
+    return await db.order.findMany({
+      where: {
+        user_id: parseInt(userId, 10)
+      },
+      include: {
+        order_items: { 
+          include: {
+            item: true
+          }
         }
+      },
+      orderBy: {
+        id: 'desc'
       }
-    },
-    orderBy: {
-      id: 'desc'
-    }
-  });
-}
+    });
+  }
+
+  
+  async getAllOrdersForAdmin() {
+    return await db.order.findMany({
+      include: {
+        order_items: {
+          include: {
+            item: true
+          }
+        }
+      },
+      orderBy: {
+        id: 'desc'
+      }
+    });
+  }
+
+  
+  async updateOrderStatus(orderId, newStatus) {
+    return await db.order.update({
+      where: {
+        id: parseInt(orderId, 10)
+      },
+      data: {
+        status: newStatus
+      }
+    });
+  }
 }
 
 module.exports = new OrdersService();
