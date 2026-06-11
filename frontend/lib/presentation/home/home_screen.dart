@@ -17,7 +17,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final OrderService _orderService = OrderService();
   
-  
   int _currentTab = 0; 
   List<dynamic> _establishments = [];
   List<ItemModel> _liveMenu = [];
@@ -39,6 +38,39 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   
+  Widget _buildStatusChip(String status) {
+    Color chipColor;
+    switch (status) {
+      case 'Опрацьовується':
+        chipColor = Colors.orangeAccent;
+        break;
+      case 'Готується':
+        chipColor = Colors.blueAccent;
+        break;
+      case 'Доставляється':
+        chipColor = Colors.purpleAccent;
+        break;
+      case 'Доставлено':
+        chipColor = Colors.green;
+        break;
+      default:
+        chipColor = Colors.grey;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: chipColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        status,
+        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  
   Future<void> _handleLogout() async {
     showDialog(
       context: context,
@@ -56,23 +88,19 @@ class _HomeScreenState extends State<HomeScreen> {
         Uri.parse('http://localhost:3000/api/auth/logout'),
         headers: {
           'Content-Type': 'application/json',
-          
           'Authorization': 'Bearer ${widget.token}', 
         },
       );
 
       statusCode = response.statusCode;
       errorMessage = response.body;
-
     } catch (e) {
       debugPrint('[Auth Error] Network failed: $e');
     }
 
-    
     if (mounted) Navigator.pop(context);
 
     if (statusCode == 200) {
-      
       debugPrint('[Auth] Session invalidated successfully on server.');
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
@@ -88,7 +116,6 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     } else {
-      
       debugPrint('[Auth Error] Server returned code: $statusCode, Body: $errorMessage');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -129,7 +156,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  
   Future<void> _fetchMenuForEstablishment(String establishmentId) async {
     setState(() {
       _isLoadingMenu = true;
@@ -162,7 +188,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  
   Future<void> _fetchUserOrders() async {
     setState(() => _isLoadingOrders = true);
     try {
@@ -184,8 +209,121 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _addToCart(int itemId) {
-    setState(() { _cart[itemId] = (_cart[itemId] ?? 0) + 1; });
+  void _updateCartItem(int itemId, int change) {
+    setState(() {
+      final currentQuantity = _cart[itemId] ?? 0;
+      final newQuantity = currentQuantity + change;
+
+      if (newQuantity <= 0) {
+        _cart.remove(itemId);
+      } else {
+        _cart[itemId] = newQuantity;
+      }
+    });
+  }
+
+  void _showCartDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          double grandTotal = 0;
+          _cart.forEach((id, qty) {
+            final item = _liveMenu.firstWhere((i) => i.id == id);
+            grandTotal += (item.price * qty);
+          });
+
+          return AlertDialog(
+            title: const Text("Ваш кошик"),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: _cart.isEmpty
+                  ? const Text("Кошик порожній")
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: _cart.length,
+                            itemBuilder: (context, index) {
+                              final item = _liveMenu[index];
+                              final cartQuantity = _cart[item.id] ?? 0;
+
+                              return Card(
+                                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 80,
+                                      height: 80,
+                                      color: Colors.grey.shade200,
+                                      child: const Icon(Icons.fastfood, color: Colors.orange),
+                                    ),
+                                    Expanded(
+                                      child: ListTile(
+                                        title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                        subtitle: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(item.description, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                            Text("Ціна: ${item.price} грн", style: const TextStyle(color: Colors.green)),
+                                          ],
+                                        ),
+                                        trailing: Row(
+                                          mainAxisSize: MainAxisSize.min, 
+                                          children: [
+                                            IconButton(
+                                              icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                                              onPressed: () {
+                                                _updateCartItem(item.id, -1);
+                                                setDialogState(() {}); 
+                                              },
+                                            ),
+                                            CartQuantityCounter(count: cartQuantity),
+                                            IconButton(
+                                              icon: const Icon(Icons.add_circle_outline, color: Colors.orange),
+                                              onPressed: () {
+                                                _updateCartItem(item.id, 1);
+                                                setDialogState(() {}); 
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const Divider(),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Text(
+                            "Разом до сплати: ${grandTotal.toStringAsFixed(2)} грн",
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text("Закрити")),
+              if (_cart.isNotEmpty)
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context); 
+                    _submitOrder();
+                  }, 
+                  child: const Text("Оформити"),
+                ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   void _clearCart() {
@@ -226,7 +364,6 @@ class _HomeScreenState extends State<HomeScreen> {
           backgroundColor: Colors.green,
         ),
       );
-      
       _fetchUserOrders();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -298,7 +435,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.orange,
-        
         title: _currentTab == 0
             ? InkWell(
                 onTap: _isLoadingEst ? null : _showLocationSelector,
@@ -317,20 +453,23 @@ class _HomeScreenState extends State<HomeScreen> {
               )
             : const Text("Мої замовлення", style: TextStyle(color: Colors.white)),
         actions: [
-          if (_currentTab == 0 && _cart.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.delete_sweep, color: Colors.white),
-              onPressed: _clearCart,
-            ),
-          
           IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            tooltip: 'Вийти з додатку',
+            icon: Stack(
+              children: [
+                const Icon(Icons.shopping_cart),
+                if (_cart.isNotEmpty)
+                  const Positioned(right: 0, child: Icon(Icons.brightness_1, size: 8, color: Colors.red)),
+              ],
+            ),
+            onPressed: _showCartDialog,
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: "Вийти із застосунку",
             onPressed: _handleLogout,
           ),
         ],
       ),
-      
       
       body: _isLoadingEst
           ? const Center(child: CircularProgressIndicator(color: Colors.orange))
@@ -354,19 +493,19 @@ class _HomeScreenState extends State<HomeScreen> {
                                   child: ListTile(
                                     title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                                     subtitle: Text("${item.description}\nЦіна: ${item.price} грн"),
-                                    isThreeLine: true,
                                     trailing: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        if (cartQuantity > 0)
-                                          Chip(
-                                            label: Text("x$cartQuantity"),
-                                            backgroundColor: Colors.orange.shade100,
+                                        if (cartQuantity > 0) ...[
+                                          IconButton(
+                                            icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                                            onPressed: () => _updateCartItem(item.id, -1),
                                           ),
-                                        const SizedBox(width: 8),
+                                          CartQuantityCounter(count: cartQuantity),
+                                        ],
                                         IconButton(
-                                          icon: const Icon(Icons.add_shopping_cart, color: Colors.orange),
-                                          onPressed: () => _addToCart(item.id),
+                                          icon: const Icon(Icons.add_circle_outline, color: Colors.orange),
+                                          onPressed: () => _updateCartItem(item.id, 1),
                                         ),
                                       ],
                                     ),
@@ -375,7 +514,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               },
                             ),
                 )
-              
               : RefreshIndicator(
                   color: Colors.orange,
                   onRefresh: _fetchUserOrders,
@@ -388,38 +526,53 @@ class _HomeScreenState extends State<HomeScreen> {
                               itemCount: _userOrders.length,
                               itemBuilder: (context, index) {
                                 final order = _userOrders[index];
+                                final orderItemsList = order['order_items'] ?? order['items'] ?? [];
+                                
+                                final statusStr = order['status'] ?? 'Опрацьовується';
+
                                 return Card(
                                   margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                   child: ExpansionTile(
-                                    leading: const Icon(Icons.receipt_long, color: Colors.orange),
-                                    title: Text("Замовлення #${order['id']}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                                    subtitle: Text("Статус: ${order['status'] ?? 'Обробка'}"),
-                                    trailing: Text(
-                                      "${order['total_price'] ?? '0'} грн",
-                                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                                    
+                                    title: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          "Замовлення #${order['id']}",
+                                          style: const TextStyle(fontWeight: FontWeight.bold),
+                                        ),
+                                        _buildStatusChip(statusStr), 
+                                      ],
                                     ),
                                     children: [
-                                      
-                                      if (order['items'] != null)
-                                        ...(order['items'] as List).map((orderItem) {
-                                          final itemDetails = orderItem['item'] ?? {};
+                                      if (orderItemsList is List)
+                                        ...orderItemsList.map((oi) {
+                                          final itemDetails = oi['item'] ?? {};
+                                          final price = double.tryParse(itemDetails['price']?.toString() ?? '0') ?? 0;
+                                          final qty = oi['quantity'] ?? 0;
                                           return ListTile(
-                                            dense: true,
                                             title: Text(itemDetails['name'] ?? 'Страва'),
-                                            subtitle: Text("Кількість: ${orderItem['quantity']}"),
-                                            trailing: Text("${(double.tryParse(itemDetails['price']?.toString() ?? '0') ?? 0) * (orderItem['quantity'] ?? 1)} грн"),
+                                            subtitle: Text("x$qty"), 
+                                            trailing: Text("${(qty * price).toStringAsFixed(2)} грн"),
                                           );
                                         }),
+                                      const Divider(),
+                                      ListTile(
+                                        title: const Text("Загальна сума:", style: TextStyle(fontWeight: FontWeight.bold)),
+                                        trailing: Text("${order['total_price']} грн", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
+                                      ),
                                     ],
                                   ),
                                 );
                               },
                             ),
                 ),
-
       
-      bottomNavigationBar: _currentTab == 0
-          ? Container(
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_currentTab == 0 && _cart.isNotEmpty)
+            Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Colors.grey.shade100,
@@ -437,7 +590,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                   ElevatedButton(
-                    onPressed: (_cart.isEmpty || _isSubmitting) ? null : _submitOrder,
+                    onPressed: _isSubmitting ? null : _submitOrder,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.orange,
                       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
@@ -448,20 +601,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   )
                 ],
               ),
-            )
-          : null,
-
-      
-      bottomSheet: BottomNavigationBar(
-        currentIndex: _currentTab,
-        selectedItemColor: Colors.orange,
-        onTap: (index) {
-          setState(() { _currentTab = index; });
-          if (index == 1) { _fetchUserOrders(); } 
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.restaurant_menu), label: 'Меню'),
-          BottomNavigationBarItem(icon: Icon(Icons.shopping_bag), label: 'Замовлення'),
+            ),
+            
+          BottomNavigationBar(
+            currentIndex: _currentTab,
+            selectedItemColor: Colors.orange,
+            onTap: (index) {
+              setState(() { _currentTab = index; });
+              if (index == 1) { _fetchUserOrders(); } 
+            },
+            items: const [
+              BottomNavigationBarItem(icon: Icon(Icons.restaurant_menu), label: 'Меню'),
+              BottomNavigationBarItem(icon: Icon(Icons.shopping_bag), label: 'Замовлення'),
+            ],
+          ),
         ],
       ),
     );
@@ -480,6 +633,26 @@ class ListViewPlaceholder extends StatelessWidget {
         SizedBox(height: MediaQuery.of(context).size.height * 0.3),
         Center(child: Text(message, style: TextStyle(color: Colors.grey.shade600, fontSize: 16))),
       ],
+    );
+  }
+}
+
+class CartQuantityCounter extends StatelessWidget {
+  final int count;
+  const CartQuantityCounter({super.key, required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade100,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        "x$count",
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.orange),
+      ),
     );
   }
 }
