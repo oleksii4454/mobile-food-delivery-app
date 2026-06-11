@@ -33,7 +33,6 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
     });
 
-    // Викликаємо сервіс логіну
     final result = await _authService.login(email, password);
 
     if (!mounted) return;
@@ -58,7 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
         print("Перенаправлення в адмін-панель");
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const AdminPanelScreen()),
+          MaterialPageRoute(builder: (context) => AdminPanelScreen(token: token)),
         );
       } else {
         print("Перенаправлення на домашній екран для користувача/кур'єра");
