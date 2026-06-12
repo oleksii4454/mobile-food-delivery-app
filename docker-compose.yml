@@ -9,3 +9,29 @@ services:
       POSTGRES_DB: delivery_db
     ports:
       - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d delivery_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  
+  backend_api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: food_delivery_backend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - DATABASE_URL=postgresql://admin:admin@my_postgres_container:5432/delivery_db?schema=public
+      - JWT_SECRET=test
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

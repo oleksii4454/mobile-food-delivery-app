@@ -52,7 +52,7 @@ class AuthService {
         body: jsonEncode({
           'email': email,
           'password': password,
-          'name': name, // Відправляємо ім'я на сервер
+          'name': name, 
         }),
       );
 

@@ -3,6 +3,7 @@ import '../../services/auth_service.dart';
 import '../home/home_screen.dart';
 import 'register_screen.dart';
 import '../admin/admin_panel_screen.dart';
+import '../courier/courier_panel_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -33,7 +34,6 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
     });
 
-    // Викликаємо сервіс логіну
     final result = await _authService.login(email, password);
 
     if (!mounted) return;
@@ -46,8 +46,6 @@ class _LoginScreenState extends State<LoginScreen> {
       final String role = (result['role'] ?? 'Клієнт').toString().trim();
       final String token = result['token'].toString();
 
-      print("Роль, яка прийшла з серверу: '$role'");
-
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -55,13 +53,16 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (role == 'Адмін') {
-        print("Перенаправлення в адмін-панель");
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const AdminPanelScreen()),
+          MaterialPageRoute(builder: (context) => AdminPanelScreen(token: token)),
+        );
+      } else if (role == 'Кур\'єр') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => CourierPanelScreen(token: token)),
         );
       } else {
-        print("Перенаправлення на домашній екран для користувача/кур'єра");
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => HomeScreen(token: token)), 
